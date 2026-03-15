@@ -1,0 +1,7 @@
+playwright==1.42.0
+sqlalchemy[asyncio]==2.0.29
+asyncpg==0.29.0
+apscheduler==3.10.4
+python-dotenv==1.0.1
+playwright-stealth
+fake-useragent

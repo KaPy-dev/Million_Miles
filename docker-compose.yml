@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mmpass}
+      POSTGRES_DB: ${POSTGRES_DB:-million_miles}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mm} -d ${POSTGRES_DB:-million_miles}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  scraper:
+    build: ./scraper
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mm}:${POSTGRES_PASSWORD:-mmpass}@postgres:5432/${POSTGRES_DB:-million_miles}
+      SCRAPER_MAX_PAGES: ${SCRAPER_MAX_PAGES:-5}
+      SCRAPER_INTERVAL_HOURS: ${SCRAPER_INTERVAL_HOURS:-1}
+      SCRAPER_MAX_CARS_PER_PAGE: ${SCRAPER_MAX_CARS_PER_PAGE:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mm}:${POSTGRES_PASSWORD:-mmpass}@postgres:5432/${POSTGRES_DB:-million_miles}
+      SECRET_KEY: ${SECRET_KEY:-supersecretkey_change_in_production}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      API_URL: ${API_URL:-http://backend:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
